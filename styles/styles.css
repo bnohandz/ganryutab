@@ -166,6 +166,10 @@ h2 {
   max-width: 900px;
 }
 
+.panel-topic .status {
+  margin-left: 10px;
+}
+
 .back-link {
   display: inline-block;
   margin-bottom: 16px;
