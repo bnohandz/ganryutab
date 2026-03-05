@@ -1,21 +1,30 @@
+import Link from "next/link";
+import { topics } from "../data/topics";
+
 function Home() {
   return (
-    <main>
-      <h1>🚧 SITE EM DESENVOLVIMENTO 🛠️</h1>
+    <main className="landing">
+      <section className="panel">
+        <span className="status">Em breve</span>
 
-      <h2>
-        Estamos preparando um espaço dedicado às histórias, curiosidades e
-        tradições do Japão.
-      </h2>
+        <h1>Jornada pelo Japão Feudal</h1>
 
-      <section>
-        <p>⚔️ Samurais e o código de honra Bushidō</p>
-        <p>🏹 Grandes guerreiros da era Sengoku</p>
-        <p>🏯 A vida no Japão durante o período Edo</p>
-        <p>🗡️ A história de lendas como Miyamoto Musashi</p>
-        <p>👘 Costumes e curiosidades da cultura japonesa antiga</p>
-        <p>🎎 Literatura clássica como o Conto de Genji</p>
-        <p>⛩️ Castelos, tradições e filosofia do Japão feudal</p>
+        <h2>
+          Estamos preparando um espaço dedicado às histórias, curiosidades e
+          tradições que marcaram séculos da cultura japonesa.
+        </h2>
+
+        <section className="topics">
+          {topics.map((topic) => (
+            <Link
+              key={topic.slug}
+              className="topic-link"
+              href={`/topicos/${topic.slug}`}
+            >
+              {topic.title}
+            </Link>
+          ))}
+        </section>
       </section>
     </main>
   );
