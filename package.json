@@ -1,7 +1,7 @@
 {
-  "name": "clone-tabnews",
+  "name": "ganryutab",
   "version": "1.0.0",
-  "description": "Projeto para treinamento.",
+  "description": "Projeto dedicado à cultura japonêsa.",
   "main": "index.js",
   "scripts": {
     "dev": "next dev",

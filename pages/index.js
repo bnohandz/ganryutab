@@ -7,7 +7,7 @@ function Home() {
       <section className="panel">
         <span className="status">Em breve</span>
 
-        <h1>Jornada pelo Japão Feudal</h1>
+        <h1>GanryuTab</h1>
 
         <h2>
           Estamos preparando um espaço dedicado às histórias, curiosidades e
