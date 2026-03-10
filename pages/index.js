@@ -7,7 +7,12 @@ function Home() {
       <section className="panel">
         <span className="status">Em breve</span>
 
-        <h1>GanryuTab</h1>
+        <h1>
+          GanryuTab{" "}
+          <a href="https://github.com/bnohandz" target="_blank" Id="autor">
+            <span>by BruNo</span>
+          </a>
+        </h1>
 
         <h2>
           Estamos preparando um espaço dedicado às histórias, curiosidades e

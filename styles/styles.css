@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap");
+@import url('https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300..700;1,300..700&family=Nova+Cut&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
 
 :root {
   --ink: #f7f4ec;
@@ -78,6 +78,24 @@ h1 {
   letter-spacing: 0.01em;
   font-size: clamp(1.95rem, 4.8vw, 3.9rem);
   color: #fff;
+}
+
+h1 #autor {
+  font-family: "Nova Cut", sans-serif;
+  display: inline-block;
+  font-size: clamp(0.95rem, 1.8vw, 1.2rem);
+  color: #423;
+  text-decoration: none;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
+  transform: translateY(14px);
+  animation: fade-up 650ms ease-out forwards;
+}
+
+h1 #autor :hover {
+  color: #992f39;
 }
 
 h2 {
