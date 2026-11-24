@@ -1,6 +1,6 @@
 import Head from "next/head";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 const regions = [
   {name:"Kyushu",x:155,y:444,info:"Porta de entrada do comércio português no século XVI; região do clã Shimazu.",d:"M112 406 L148 389 190 410 181 451 155 492 125 475 137 445 110 431 Z"},
@@ -16,14 +16,76 @@ const regions = [
 export default function MapPage(){
   const [hover,setHover]=useState(null);
   const [selected,setSelected]=useState(null);
-  const active=hover || selected;
+  const [view,setView]=useState({x:0,y:0,z:1});
+  const [dragging,setDragging]=useState(false);
+  const svgRef=useRef(null), current=useRef(view), pointers=useRef(new Map()), gesture=useRef(null), moved=useRef(false);
+  const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+  function apply(v){
+    const z=clamp(v.z,1,4);
+    const next={z,x:clamp(v.x,0,800-800/z),y:clamp(v.y,0,540-540/z)};
+    current.current=next;setView(next);
+  }
+  function point(x,y){
+    const svg=svgRef.current,p=svg.createSVGPoint();p.x=x;p.y=y;
+    return p.matrixTransform(svg.getScreenCTM().inverse());
+  }
+  function zoom(factor,anchor){
+    const v=current.current,z=clamp(v.z*factor,1,4),p=anchor||{x:v.x+400/v.z,y:v.y+270/v.z};
+    apply({z,x:p.x-(p.x-v.x)*v.z/z,y:p.y-(p.y-v.y)*v.z/z});setHover(null);
+  }
+  useEffect(()=>{
+    const svg=svgRef.current;
+    function wheel(e){e.preventDefault();zoom(Math.exp(-e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?540:1)*.002),point(e.clientX,e.clientY));}
+    svg.addEventListener("wheel",wheel,{passive:false});
+    return ()=>svg.removeEventListener("wheel",wheel);
+  },[]);
+  function snapshot(){
+    const [a,b]=[...pointers.current.values()];
+    const x=b?(a.x+b.x)/2:a.x,y=b?(a.y+b.y)/2:a.y;
+    return {x,y,d:b?Math.hypot(a.x-b.x,a.y-b.y):0,anchor:point(x,y),view:{...current.current}};
+  }
+  function down(e){
+    if(e.button!==0)return;
+    if(!pointers.current.size)moved.current=false;
+    pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    gesture.current=snapshot();
+    if(pointers.current.size>1){moved.current=true;setDragging(true);setHover(null);}
+  }
+  function move(e){
+    if(!pointers.current.has(e.pointerId))return;
+    pointers.current.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    const g=gesture.current,[a,b]=[...pointers.current.values()];
+    const x=b?(a.x+b.x)/2:a.x,y=b?(a.y+b.y)/2:a.y;
+    if(!moved.current && Math.hypot(x-g.x,y-g.y)<5)return;
+    moved.current=true;setDragging(true);setHover(null);
+    if(!e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.setPointerCapture(e.pointerId);
+    const z=clamp(b&&g.d?g.view.z*Math.hypot(a.x-b.x,a.y-b.y)/g.d:g.view.z,1,4);
+    const now=point(x,y),v=current.current;
+    apply({z,x:g.anchor.x-(now.x-v.x)*v.z/z,y:g.anchor.y-(now.y-v.y)*v.z/z});
+  }
+  function up(e){
+    if(!pointers.current.delete(e.pointerId))return;
+    if(pointers.current.size)gesture.current=snapshot();
+    else {gesture.current=null;setDragging(false);}
+  }
+  const active=dragging?null:hover || selected;
   return <main className="atlas">
     <Head><title>Atlas do Japão | GanryuTab</title></Head>
     <header><Link href="/">← GanryuTab</Link><span>日本 • ATLAS HISTÓRICO</span></header>
     <h1>Explore o Japão feudal</h1>
-    <p>Passe o mouse, toque ou navegue com Tab pelas regiões para descobrir suas histórias.</p>
+    <p>Use a roda do mouse ou os botões para ampliar. Arraste para explorar; no celular, use dois dedos para ampliar. Passe o mouse ou toque nas regiões para descobrir suas histórias.</p>
+    <div className="controls" aria-label="Controles do mapa">
+      <button onClick={()=>zoom(1/1.25)} disabled={view.z<=1} aria-label="Diminuir zoom">−</button>
+      <output aria-live="polite">{Math.round(view.z*100)}%</output>
+      <button onClick={()=>zoom(1.25)} disabled={view.z>=4} aria-label="Aumentar zoom">+</button>
+      <button onClick={()=>{apply({x:0,y:0,z:1});setHover(null);setSelected(null)}}>Restaurar</button>
+      <button disabled={view.z<=1} onClick={()=>apply({...view,x:view.x-100/view.z})} aria-label="Mover para oeste">←</button>
+      <button disabled={view.z<=1} onClick={()=>apply({...view,y:view.y-100/view.z})} aria-label="Mover para norte">↑</button>
+      <button disabled={view.z<=1} onClick={()=>apply({...view,y:view.y+100/view.z})} aria-label="Mover para sul">↓</button>
+      <button disabled={view.z<=1} onClick={()=>apply({...view,x:view.x+100/view.z})} aria-label="Mover para leste">→</button>
+    </div>
     <div className="sheet">
-      <svg viewBox="0 0 800 540" aria-label="Mapa ilustrativo das regiões japonesas">
+      <svg ref={svgRef} className={dragging?"dragging":""} viewBox={view.x+" "+view.y+" "+800/view.z+" "+540/view.z} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onLostPointerCapture={up} onPointerLeave={e=>{if(!e.currentTarget.hasPointerCapture(e.pointerId))up(e)}} onClickCapture={e=>{if(moved.current && e.detail!==0){e.stopPropagation();e.preventDefault();moved.current=false;}}} aria-label="Mapa ilustrativo das regiões japonesas">
         <defs>
           <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".65" numOctaves="3" stitchTiles="stitch"/></filter>
           <pattern id="sea" width="60" height="38" patternUnits="userSpaceOnUse"><path d="M5 22 Q15 15 25 22 T45 22" fill="none" stroke="#577f7a" opacity=".25"/></pattern>
@@ -47,7 +109,8 @@ export default function MapPage(){
       header{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:14px} header :global(a){color:#e7c18a;text-decoration:none}
       h1{font-size:clamp(28px,5vw,48px);margin:28px 0 8px} p{line-height:1.5;margin:0 0 18px}
       .sheet{position:relative;border:8px solid #a18b65;background:#e7d6aa;box-shadow:0 12px 40px #0008;border-radius:3px;overflow:hidden}
-      svg{display:block;width:100%;height:auto}.region{cursor:pointer;outline:none}.region path{transition:fill .18s}.region:focus-visible>path{stroke:#a34c3b;stroke-width:4}
+       .controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}.controls button{background:#342b22;color:#f4e4c6;border:1px solid #9a8059;border-radius:4px;padding:8px 13px;cursor:pointer;font:inherit}.controls button:disabled{opacity:.45;cursor:default}.controls output{min-width:52px;text-align:center}
+      svg{display:block;width:100%;height:auto;aspect-ratio:800/540;touch-action:none;user-select:none;cursor:grab}svg.dragging,svg.dragging .region{cursor:grabbing}.region{cursor:pointer;outline:none}.region path{transition:fill .18s}.region:focus-visible>path{stroke:#a34c3b;stroke-width:4}
       .tooltip{position:absolute;bottom:12px;left:12px;max-width:min(300px,calc(100% - 24px));box-sizing:border-box;padding:14px 32px 10px 14px;background:#f5e8c8;color:#382e23;border:1px solid #8c7150;box-shadow:0 4px 16px #0004;border-radius:4px;pointer-events:auto}.tooltip p{font-size:14px;margin:5px 0}.tooltip button{position:absolute;right:6px;top:5px;background:none;border:0;color:#382e23;font-size:22px;cursor:pointer}
       small{display:block;margin-top:16px;color:#c8bba4;line-height:1.5}
     `}</style>
