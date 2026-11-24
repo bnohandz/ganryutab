@@ -148,6 +148,17 @@ const landmarks = [
 const categories = {castle:"Castelos",city:"Cidades",temple:"Santuários",event:"Locais históricos",nature:"Natureza"};
 const symbols = {castle:"城",city:"町",temple:"社",event:"史",nature:"山"};
 
+const storageKey="ganryutab.atlas.progress.v1";
+const missions=[
+  {id:"first",title:"Primeiros passos",ids:["ganryu"],reward:25,question:"Em que ano teria ocorrido o duelo na ilha Ganryu?",options:["1600","1612","1583"],answer:1},
+  {id:"power",title:"Centros do poder",ids:["kyoto","osaka","edo"],reward:50,question:"Quem iniciou a construção do Castelo de Osaka?",options:["Date Masamune","Tokugawa Ieyasu","Toyotomi Hideyoshi"],answer:2},
+  {id:"culture",title:"Caminhos sagrados",ids:["fuji","itsukushima"],reward:40,question:"Qual santuário é conhecido pelo torii sobre a água?",options:["Itsukushima","Kochi","Matsumae"],answer:0},
+  {id:"atlas",title:"Mestre do atlas",ids:landmarks.map(p=>p.id),reward:100,question:"Qual cidade foi desenvolvida por Date Masamune?",options:["Nagasaki","Sendai","Kyoto"],answer:1}
+];
+function validIds(value,allowed){
+  return Array.isArray(value)?[...new Set(value.filter(id=>allowed.includes(id)))]:[];
+}
+
 export default function MapPage(){
   const [hover,setHover]=useState(null);
   const [selected,setSelected]=useState(null);
@@ -155,8 +166,40 @@ export default function MapPage(){
   const [dragging,setDragging]=useState(false);
   const [category,setCategory]=useState("all");
   const [discovered,setDiscovered]=useState([]);
+  const [completed,setCompleted]=useState([]);
+  const [loaded,setLoaded]=useState(false);
+  const [storageError,setStorageError]=useState(false);
+  const [answers,setAnswers]=useState({});
+  useEffect(()=>{
+    try{
+      const raw=window.localStorage.getItem(storageKey);
+      if(raw){
+        const data=JSON.parse(raw);
+        const found=validIds(data?.discovered,landmarks.map(p=>p.id));
+        setDiscovered(found);
+        setCompleted(validIds(data?.completed,missions.filter(m=>m.ids.every(id=>found.includes(id))).map(m=>m.id)));
+      }
+    }catch{setStorageError(true);}
+    finally{setLoaded(true);}
+  },[]);
+  useEffect(()=>{
+    if(!loaded)return;
+    try{window.localStorage.setItem(storageKey,JSON.stringify({discovered,completed}));}
+    catch{setStorageError(true);}
+  },[loaded,discovered,completed]);
+  const xp=discovered.length*10+missions.filter(m=>completed.includes(m.id)).reduce((sum,m)=>sum+m.reward,0);
+  const rank=xp>=300?"Mestre":xp>=150?"Samurai":xp>=50?"Discípulo":"Aprendiz";
+  function answer(m,index){
+    if(!loaded||completed.includes(m.id)||!m.ids.every(id=>discovered.includes(id)))return;
+    setAnswers(old=>({...old,[m.id]:index===m.answer?"correct":"wrong"}));
+    if(index===m.answer)setCompleted(old=>old.includes(m.id)?old:[...old,m.id]);
+  }
+  function resetProgress(){
+    if(!window.confirm("Apagar todas as descobertas, missões e XP deste navegador?"))return;
+    setDiscovered([]);setCompleted([]);setAnswers({});setSelected(null);setHover(null);
+  }
   const visible=landmarks.filter(p=>view.z>=p.minZoom && (category==="all"||p.type===category));
-  function discover(p){setSelected(p);setDiscovered(old=>old.includes(p.id)?old:[...old,p.id]);}
+  function discover(p){if(!loaded)return;setSelected(p);setDiscovered(old=>old.includes(p.id)?old:[...old,p.id]);}
   useEffect(()=>{if(selected?.id && !visible.some(p=>p.id===selected.id))setSelected(null);if(hover?.id && !visible.some(p=>p.id===hover.id))setHover(null);},[view.z,category,selected,hover]);
   const svgRef=useRef(null), current=useRef(view), pointers=useRef(new Map()), gesture=useRef(null), moved=useRef(false);
   const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
@@ -214,6 +257,13 @@ export default function MapPage(){
     <header><Link href="/">← GanryuTab</Link><span>日本 • ATLAS HISTÓRICO</span></header>
     <h1>Explore o Japão feudal</h1>
     <p>Use a roda do mouse ou os botões para ampliar. Arraste para explorar; no celular, use dois dedos para ampliar. Passe o mouse ou toque nas regiões para descobrir suas histórias.</p>
+    <section className="progress" aria-label="Progresso do explorador">
+      <div><strong>{rank}</strong><span>{xp} XP</span></div>
+      <progress max={355} value={xp} aria-label="Experiência total"/>
+      <p>+10 XP por novo local · {completed.length}/{missions.length} missões concluídas</p>
+      <p role="status">{!loaded?"Carregando progresso…":storageError?"Armazenamento local indisponível ou inválido; o progresso pode não ser recuperado.":"Progresso salvo neste navegador."}</p>
+      <button disabled={!loaded} onClick={resetProgress}>Reiniciar progresso</button>
+    </section>
     <div className="controls" aria-label="Controles do mapa">
       <button onClick={()=>zoom(1/1.25)} disabled={view.z<=1} aria-label="Diminuir zoom">−</button>
       <output aria-live="polite">{Math.round(view.z*100)}%</output>
@@ -256,6 +306,21 @@ export default function MapPage(){
       {active && <aside className="tooltip" role="status"><strong>{active.name}</strong>{active.id && <div className="kind">{categories[active.type]} · {active.region}{discovered.includes(active.id)?" · Descoberto":""}</div>}<p>{active.info}</p><button onClick={()=>{setSelected(null);setHover(null)}} aria-label="Fechar informações">×</button></aside>}
     </div>
     <div className="legend">{Object.entries(categories).map(([key,label])=><span key={key}>{symbols[key]} · {label}</span>)}</div>
+    <section className="missions" aria-label="Missões históricas">
+      <h2>Missões do explorador</h2>
+      {missions.map(m=>{
+        const count=m.ids.filter(id=>discovered.includes(id)).length,done=completed.includes(m.id),ready=count===m.ids.length;
+        return <article key={m.id}>
+          <h3>{m.title} · +{m.reward} XP</h3>
+          <p>{done?"Concluída":ready?"Quiz desbloqueado":count+"/"+m.ids.length+" locais descobertos"}</p>
+          <progress value={count} max={m.ids.length} aria-label={"Descobertas: "+m.title}/>
+          <p>Explore: {m.ids.map(id=>landmarks.find(p=>p.id===id).name).join(", ")}.</p>
+          {ready&&!done&&<div><p>{m.question}</p><div className="options">{m.options.map((option,i)=><button key={option} onClick={()=>answer(m,i)} disabled={!loaded}>{option}</button>)}</div></div>}
+          {answers[m.id]==="wrong"&&!done&&<p role="status">Ainda não! Revise os locais e tente novamente.</p>}
+          {done&&<p role="status">✓ Missão concluída. Recompensa recebida!</p>}
+        </article>
+      })}
+    </section>
     <small>Mapa artístico esquemático, sem escala ou fronteiras históricas exatas. Regiões modernas usadas como referência, com Ezo como denominação histórica.</small>
     <style jsx>{`
       .atlas{min-height:100vh;background:#191713;color:#eee2c9;padding:24px max(16px,calc((100vw - 1050px)/2));font-family:Georgia,serif}
@@ -266,6 +331,7 @@ export default function MapPage(){
       svg{display:block;width:100%;height:auto;aspect-ratio:800/540;touch-action:none;user-select:none;cursor:grab}svg.dragging,svg.dragging .region{cursor:grabbing}.region{cursor:pointer;outline:none}.region path{transition:fill .18s}.region:focus-visible>path{stroke:#a34c3b;stroke-width:4}
       .tooltip{position:absolute;bottom:12px;left:12px;max-width:min(300px,calc(100% - 24px));box-sizing:border-box;padding:14px 32px 10px 14px;background:#f5e8c8;color:#382e23;border:1px solid #8c7150;box-shadow:0 4px 16px #0004;border-radius:4px;pointer-events:auto}.tooltip p{font-size:14px;margin:5px 0}.tooltip button{position:absolute;right:6px;top:5px;background:none;border:0;color:#382e23;font-size:22px;cursor:pointer}
       .exploration{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;font-size:14px}.exploration p{flex-basis:100%;margin:0;color:#d7c5a4}.exploration select{background:#342b22;color:#f4e4c6;border:1px solid #9a8059;padding:7px;border-radius:4px}.legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:13px;color:#e1c9a1}.landmark{cursor:pointer;outline:none}.landmark:focus-visible circle:nth-child(2){stroke:#fff;stroke-width:3}.kind{font-size:12px;color:#77553b;margin-top:4px}
+      .progress,.missions article{border:1px solid #8c7150;background:#29231c;border-radius:6px;padding:16px;margin-bottom:14px}.progress>div{display:flex;justify-content:space-between;color:#e7c18a;font-size:20px}.progress p,.missions p{font-size:14px;margin:8px 0}.progress progress,.missions progress{width:100%;accent-color:#a4a878}.progress button,.options button{background:#403326;color:#f4e4c6;border:1px solid #9a8059;border-radius:4px;padding:8px 12px;cursor:pointer;font:inherit}.options{display:flex;flex-wrap:wrap;gap:8px}.missions{margin-top:24px}.missions h3{margin:0 0 8px;color:#e7c18a}
       small{display:block;margin-top:16px;color:#c8bba4;line-height:1.5}
     `}</style>
   </main>
