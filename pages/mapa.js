@@ -13,11 +13,151 @@ const regions = [
   {name:"Ezo",x:650,y:65,info:"Atual Hokkaido, território historicamente habitado pelos povos Ainu.",d:"M588 88 L605 61 596 30 641 40 672 14 715 45 744 52 712 85 661 99 630 80 613 110 Z"}
 ];
 
+const landmarks = [
+  {
+    "id": "nagasaki",
+    "name": "Nagasaki",
+    "region": "Kyushu",
+    "type": "city",
+    "x": 130,
+    "y": 456,
+    "minZoom": 2,
+    "info": "Porto aberto ao comércio português em 1571; tornou-se um centro de intercâmbio com o exterior."
+  },
+  {
+    "id": "kumamoto",
+    "name": "Castelo de Kumamoto",
+    "region": "Kyushu",
+    "type": "castle",
+    "x": 164,
+    "y": 465,
+    "minZoom": 2.5,
+    "info": "Grande fortaleza cuja construção por Kato Kiyomasa foi concluída em 1607."
+  },
+  {
+    "id": "kochi",
+    "name": "Castelo de Kochi",
+    "region": "Shikoku",
+    "type": "castle",
+    "x": 253,
+    "y": 428,
+    "minZoom": 2,
+    "info": "Construído no início do período Edo sob Yamauchi Kazutoyo."
+  },
+  {
+    "id": "ganryu",
+    "name": "Ilha Ganryu",
+    "region": "Chugoku",
+    "type": "event",
+    "x": 184,
+    "y": 390,
+    "minZoom": 2,
+    "info": "Ilha no estreito de Kanmon, tradicionalmente associada ao duelo entre Musashi e Sasaki Kojiro em 1612."
+  },
+  {
+    "id": "itsukushima",
+    "name": "Santuário de Itsukushima",
+    "region": "Chugoku",
+    "type": "temple",
+    "x": 228,
+    "y": 373,
+    "minZoom": 2.5,
+    "info": "Santuário xintoísta conhecido pelo torii sobre a água; recebeu o patrocínio de Taira no Kiyomori no século XII."
+  },
+  {
+    "id": "himeji",
+    "name": "Castelo de Himeji",
+    "region": "Kansai",
+    "type": "castle",
+    "x": 319,
+    "y": 350,
+    "minZoom": 2.5,
+    "info": "A estrutura principal atual foi concluída em 1609, sob Ikeda Terumasa."
+  },
+  {
+    "id": "kyoto",
+    "name": "Kyoto",
+    "region": "Kansai",
+    "type": "city",
+    "x": 374,
+    "y": 324,
+    "minZoom": 2,
+    "info": "Sede imperial durante grande parte da história japonesa."
+  },
+  {
+    "id": "osaka",
+    "name": "Castelo de Osaka",
+    "region": "Kansai",
+    "type": "castle",
+    "x": 376,
+    "y": 367,
+    "minZoom": 2,
+    "info": "Toyotomi Hideyoshi iniciou sua construção em 1583."
+  },
+  {
+    "id": "sekigahara",
+    "name": "Sekigahara",
+    "region": "Chubu",
+    "type": "event",
+    "x": 410,
+    "y": 294,
+    "minZoom": 2,
+    "info": "Local da batalha de 1600 que consolidou a ascensão de Tokugawa Ieyasu."
+  },
+  {
+    "id": "fuji",
+    "name": "Monte Fuji",
+    "region": "Chubu",
+    "type": "nature",
+    "x": 477,
+    "y": 310,
+    "minZoom": 2.5,
+    "info": "Montanha sagrada e importante símbolo cultural e religioso do Japão."
+  },
+  {
+    "id": "edo",
+    "name": "Castelo de Edo",
+    "region": "Kanto",
+    "type": "castle",
+    "x": 548,
+    "y": 285,
+    "minZoom": 2,
+    "info": "Centro do governo do xogunato Tokugawa a partir de 1603."
+  },
+  {
+    "id": "sendai",
+    "name": "Sendai",
+    "region": "Tohoku",
+    "type": "city",
+    "x": 580,
+    "y": 190,
+    "minZoom": 2,
+    "info": "Cidade desenvolvida por Date Masamune no início do século XVII."
+  },
+  {
+    "id": "matsumae",
+    "name": "Castelo de Matsumae",
+    "region": "Ezo",
+    "type": "castle",
+    "x": 620,
+    "y": 83,
+    "minZoom": 2,
+    "info": "Fortaleza do sul de Ezo; o castelo atual remonta ao fim do período Edo."
+  }
+];
+const categories = {castle:"Castelos",city:"Cidades",temple:"Santuários",event:"Locais históricos",nature:"Natureza"};
+const symbols = {castle:"城",city:"町",temple:"社",event:"史",nature:"山"};
+
 export default function MapPage(){
   const [hover,setHover]=useState(null);
   const [selected,setSelected]=useState(null);
   const [view,setView]=useState({x:0,y:0,z:1});
   const [dragging,setDragging]=useState(false);
+  const [category,setCategory]=useState("all");
+  const [discovered,setDiscovered]=useState([]);
+  const visible=landmarks.filter(p=>view.z>=p.minZoom && (category==="all"||p.type===category));
+  function discover(p){setSelected(p);setDiscovered(old=>old.includes(p.id)?old:[...old,p.id]);}
+  useEffect(()=>{if(selected?.id && !visible.some(p=>p.id===selected.id))setSelected(null);if(hover?.id && !visible.some(p=>p.id===hover.id))setHover(null);},[view.z,category,selected,hover]);
   const svgRef=useRef(null), current=useRef(view), pointers=useRef(new Map()), gesture=useRef(null), moved=useRef(false);
   const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
   function apply(v){
@@ -84,6 +224,11 @@ export default function MapPage(){
       <button disabled={view.z<=1} onClick={()=>apply({...view,y:view.y+100/view.z})} aria-label="Mover para sul">↓</button>
       <button disabled={view.z<=1} onClick={()=>apply({...view,x:view.x+100/view.z})} aria-label="Mover para leste">→</button>
     </div>
+    <div className="exploration">
+      <label>Explorar: <select value={category} onChange={e=>{setCategory(e.target.value);setHover(null);setSelected(null)}}><option value="all">Todos os locais</option>{Object.entries(categories).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+      <span aria-live="polite">Descobertos: {discovered.length}/{landmarks.length}</span>
+      <p>{view.z<2?"Amplie até 200% para revelar locais históricos.":view.z<2.5?"Mais locais aparecem a partir de 250%.":"Todos os níveis de exploração desbloqueados."}</p>
+    </div>
     <div className="sheet">
       <svg ref={svgRef} className={dragging?"dragging":""} viewBox={view.x+" "+view.y+" "+800/view.z+" "+540/view.z} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onLostPointerCapture={up} onPointerLeave={e=>{if(!e.currentTarget.hasPointerCapture(e.pointerId))up(e)}} onClickCapture={e=>{if(moved.current && e.detail!==0){e.stopPropagation();e.preventDefault();moved.current=false;}}} aria-label="Mapa ilustrativo das regiões japonesas">
         <defs>
@@ -99,10 +244,18 @@ export default function MapPage(){
           <path d={r.d} fill={active===r?"#d6a66e":"#e7d6aa"} stroke="#655b43" strokeWidth="2" strokeLinejoin="round"/>
           <g pointerEvents="none"><use href="#mount" x={r.x-14} y={r.y-22}/><use href="#mount" x={r.x+13} y={r.y-18} transform=""/><rect x={r.x-35} y={r.y-2} width="70" height="20" rx="2" fill="#f1e3bf" stroke="#9a7851"/><text x={r.x} y={r.y+12} textAnchor="middle" fontSize="12" fill="#493a2b" fontFamily="serif">{r.name}</text></g>
         </g>)}
-        <g pointerEvents="none"><use href="#castle" x="382" y="365"/><use href="#castle" x="550" y="312"/><use href="#castle" x="147" y="466"/><path d="M430 267 Q449 280 462 307 M563 125 Q578 151 570 183 M205 357 Q230 367 260 350" fill="none" stroke="#69958c" strokeWidth="2"/><g transform="translate(710 465)" stroke="#806044" fill="none"><circle r="27"/><path d="M0 -35 L6 0 0 35 -6 0 Z M-35 0 L0 -6 35 0 0 6 Z"/><text x="0" y="-39" textAnchor="middle" fill="#806044" stroke="none">N</text></g><rect x="38" y="448" width="47" height="47" rx="4" fill="none" stroke="#a34c3b" strokeWidth="3"/><text x="61" y="480" textAnchor="middle" fill="#a34c3b" fontSize="25">巌</text><rect width="800" height="540" filter="url(#grain)" opacity=".12" style={{mixBlendMode:"multiply"}}/></g>
+        <g pointerEvents="none"><path d="M430 267 Q449 280 462 307 M563 125 Q578 151 570 183 M205 357 Q230 367 260 350" fill="none" stroke="#69958c" strokeWidth="2"/><g transform="translate(710 465)" stroke="#806044" fill="none"><circle r="27"/><path d="M0 -35 L6 0 0 35 -6 0 Z M-35 0 L0 -6 35 0 0 6 Z"/><text x="0" y="-39" textAnchor="middle" fill="#806044" stroke="none">N</text></g><rect x="38" y="448" width="47" height="47" rx="4" fill="none" stroke="#a34c3b" strokeWidth="3"/><text x="61" y="480" textAnchor="middle" fill="#a34c3b" fontSize="25">巌</text><rect width="800" height="540" filter="url(#grain)" opacity=".12" style={{mixBlendMode:"multiply"}}/></g>
+        {visible.map(p=><g key={p.id} className="landmark" role="button" tabIndex={0} aria-label={p.name+": "+p.info} aria-pressed={selected===p}
+          transform={"translate("+p.x+" "+p.y+") scale("+1/view.z+")"}
+          onMouseEnter={()=>setHover(p)} onMouseLeave={()=>setHover(null)} onFocus={()=>setHover(p)} onBlur={()=>setHover(null)}
+          onClick={()=>discover(p)} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();discover(p)}if(e.key==="Escape"){setHover(null);setSelected(null)}}}>
+          <circle r="16" fill="transparent"/><circle r="11" fill={active===p?"#e2ad66":discovered.includes(p.id)?"#536c52":"#8e3e2e"} stroke="#f7e7bc" strokeWidth="1.5"/>
+          <text y="4" textAnchor="middle" fontSize="12" fill="#fff4d8" pointerEvents="none">{symbols[p.type]}</text>
+        </g>)}
       </svg>
-      {active && <aside className="tooltip" role="status"><strong>{active.name}</strong><p>{active.info}</p><button onClick={()=>{setSelected(null);setHover(null)}} aria-label="Fechar informações">×</button></aside>}
+      {active && <aside className="tooltip" role="status"><strong>{active.name}</strong>{active.id && <div className="kind">{categories[active.type]} · {active.region}{discovered.includes(active.id)?" · Descoberto":""}</div>}<p>{active.info}</p><button onClick={()=>{setSelected(null);setHover(null)}} aria-label="Fechar informações">×</button></aside>}
     </div>
+    <div className="legend">{Object.entries(categories).map(([key,label])=><span key={key}>{symbols[key]} · {label}</span>)}</div>
     <small>Mapa artístico esquemático, sem escala ou fronteiras históricas exatas. Regiões modernas usadas como referência, com Ezo como denominação histórica.</small>
     <style jsx>{`
       .atlas{min-height:100vh;background:#191713;color:#eee2c9;padding:24px max(16px,calc((100vw - 1050px)/2));font-family:Georgia,serif}
@@ -112,6 +265,7 @@ export default function MapPage(){
        .controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}.controls button{background:#342b22;color:#f4e4c6;border:1px solid #9a8059;border-radius:4px;padding:8px 13px;cursor:pointer;font:inherit}.controls button:disabled{opacity:.45;cursor:default}.controls output{min-width:52px;text-align:center}
       svg{display:block;width:100%;height:auto;aspect-ratio:800/540;touch-action:none;user-select:none;cursor:grab}svg.dragging,svg.dragging .region{cursor:grabbing}.region{cursor:pointer;outline:none}.region path{transition:fill .18s}.region:focus-visible>path{stroke:#a34c3b;stroke-width:4}
       .tooltip{position:absolute;bottom:12px;left:12px;max-width:min(300px,calc(100% - 24px));box-sizing:border-box;padding:14px 32px 10px 14px;background:#f5e8c8;color:#382e23;border:1px solid #8c7150;box-shadow:0 4px 16px #0004;border-radius:4px;pointer-events:auto}.tooltip p{font-size:14px;margin:5px 0}.tooltip button{position:absolute;right:6px;top:5px;background:none;border:0;color:#382e23;font-size:22px;cursor:pointer}
+      .exploration{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;font-size:14px}.exploration p{flex-basis:100%;margin:0;color:#d7c5a4}.exploration select{background:#342b22;color:#f4e4c6;border:1px solid #9a8059;padding:7px;border-radius:4px}.legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:13px;color:#e1c9a1}.landmark{cursor:pointer;outline:none}.landmark:focus-visible circle:nth-child(2){stroke:#fff;stroke-width:3}.kind{font-size:12px;color:#77553b;margin-top:4px}
       small{display:block;margin-top:16px;color:#c8bba4;line-height:1.5}
     `}</style>
   </main>
