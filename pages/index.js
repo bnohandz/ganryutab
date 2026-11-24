@@ -20,6 +20,9 @@ function Home() {
         </h2>
 
         <section className="topics">
+          <Link href="/mapa" className="topic-link" style={{ background: "#963e2b", color: "#fff4dc", fontWeight: 700 }}>
+            🗺 Explorar o mapa do Japão feudal →
+          </Link>
           {topics.map((topic) => (
             <Link
               key={topic.slug}
